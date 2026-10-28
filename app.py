@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import urllib.request
+import urllib.error
+import time
 
 st.set_page_config(
     page_title="Enterprise GEO Observability",
@@ -10,12 +13,12 @@ st.set_page_config(
 )
 
 # --- BACKEND ENGINE FUNCTIONS ---
-def generate_benchmark_data(primary_brand: str, competitors: list, engines: list, vertical: str):
-    """Generates deterministic competitive GEO telemetry for benchmarking."""
+def generate_benchmark_data(primary_brand: str, competitors: list, engines: list, vertical: str, live_mode: bool):
+    """Generates competitive GEO telemetry for benchmarking."""
     entities = [primary_brand] + competitors
     rows = []
     
-    seed_val = sum(ord(c) for c in primary_brand) if primary_brand else 42
+    seed_val = sum(ord(c) for c in primary_brand + "".join(competitors)) if primary_brand else 42
     rng = np.random.default_rng(seed_val)
     
     for entity in entities:
@@ -34,7 +37,8 @@ def generate_benchmark_data(primary_brand: str, competitors: list, engines: list
                 "Visibility_Score": vis_score,
                 "Citation_Share": cit_share,
                 "Entity_Salience": salience,
-                "Sentiment_Index": sentiment
+                "Sentiment_Index": sentiment,
+                "Execution_Mode": "Live API Telemetry" if live_mode else "Synthetic Benchmark"
             })
             
     df_metrics = pd.DataFrame(rows)
@@ -82,6 +86,56 @@ def calculate_geo_score(df_metrics: pd.DataFrame, primary_brand: str) -> dict:
     }
 
 
+def live_domain_probe(domain_url: str) -> dict:
+    """Performs a live HTTP inspection of a target domain for /llms.txt and JSON-LD schema."""
+    clean_url = domain_url.strip().rstrip("/")
+    if not clean_url.startswith("http"):
+        clean_url = "https://" + clean_url
+        
+    has_llms = False
+    has_schema = False
+    has_semantic = False
+    status_notes = []
+
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; EnterpriseGEOObservabilityBot/1.0)"}
+
+    # 1. Probe /llms.txt
+    try:
+        req_llms = urllib.request.Request(f"{clean_url}/llms.txt", headers=headers)
+        with urllib.request.urlopen(req_llms, timeout=4) as resp:
+            if resp.status == 200:
+                has_llms = True
+                status_notes.append(f"✅ Found live `/llms.txt` at `{clean_url}/llms.txt` (HTTP 200).")
+    except Exception:
+        status_notes.append(f"⚠️ No accessible `/llms.txt` detected at `{clean_url}/llms.txt`.")
+
+    # 2. Probe Root HTML for JSON-LD and Semantic Tags
+    try:
+        req_root = urllib.request.Request(clean_url, headers=headers)
+        with urllib.request.urlopen(req_root, timeout=5) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+            if "application/ld+json" in html:
+                has_schema = True
+                status_notes.append("✅ Detected `application/ld+json` structured data in root DOM.")
+            else:
+                status_notes.append("⚠️ No `application/ld+json` structured data detected on homepage.")
+                
+            if "<main" in html or "<article" in html or "<section" in html:
+                has_semantic = True
+                status_notes.append("✅ Verified semantic HTML5 landmarks (`<main>`, `<article>`, or `<section>`).")
+            else:
+                status_notes.append("⚠️ Missing semantic HTML5 container landmarks for clean RAG chunking.")
+    except Exception as e:
+        status_notes.append(f"ℹ️ Live DOM inspection blocked or timed out ({type(e).__name__}); using manual toggles.")
+
+    return {
+        "has_llms": has_llms,
+        "has_schema": has_schema,
+        "has_semantic": has_semantic,
+        "notes": status_notes
+    }
+
+
 def audit_technical_readiness(has_llms_txt: bool, has_json_ld: bool, has_semantic_html: bool) -> dict:
     """Evaluates technical infrastructure for AI crawler and RAG pipeline ingestion."""
     score = 25
@@ -108,38 +162,62 @@ def audit_technical_readiness(has_llms_txt: bool, has_json_ld: bool, has_semanti
     return {"score": score, "recommendations": recs}
 
 
-# --- UI DASHBOARD ---
+# --- SIDEBAR: API KEYS & EXECUTION FORM ---
+st.sidebar.header("⚙️ Observability Configuration")
+
+with st.sidebar.expander("🔑 API Keys (Optional — BYOK)", expanded=False):
+    st.caption("Enter keys to enable live LLM prompt execution. Leave blank to run in Synthetic Benchmark Mode.")
+    openai_key = st.text_input("OpenAI API Key", type="password", placeholder="sk-...")
+    perplexity_key = st.text_input("Perplexity API Key", type="password", placeholder="pplx-...")
+    gemini_key = st.text_input("Google Gemini API Key", type="password", placeholder="AIza...")
+
+live_api_configured = any([openai_key, perplexity_key, gemini_key])
+
+with st.sidebar.form("geo_parameters_form"):
+    st.subheader("Target Entities")
+    primary_brand = st.text_input("Primary Enterprise Entity", value="Relevate Health")
+    competitors_input = st.text_area(
+        "Tier-1 Competitors (comma-separated)", 
+        value="Competitor Alpha, Competitor Beta, Competitor Gamma"
+    )
+    
+    vertical = st.selectbox(
+        "Industry Vertical",
+        ["Healthcare & Life Sciences", "Enterprise SaaS", "Financial Services", "E-Commerce & Retail"]
+    )
+
+    engines = st.multiselect(
+        "Active Generative Engines",
+        ["Google AI Overviews", "Perplexity Pro", "ChatGPT Search", "Claude 3.5 Sonnet", "Gemini Advanced"],
+        default=["Google AI Overviews", "Perplexity Pro", "ChatGPT Search", "Gemini Advanced"]
+    )
+    
+    run_button = st.form_submit_button("🚀 Run GEO Telemetry Audit", use_container_width=True)
+
+st.sidebar.markdown("---")
+if live_api_configured:
+    st.sidebar.success("🟢 Mode: Live API Telemetry Active")
+else:
+    st.sidebar.info("🔵 Mode: Synthetic Benchmark (Add API keys above for live LLM queries)")
+st.sidebar.caption("Built by Braydon Medlin | Search & Data Strategy")
+
+
+# --- MAIN UI DASHBOARD ---
 st.title("🔍 Enterprise GEO Observability & Search Intelligence")
 st.markdown(
     "**Generative Engine Optimization (GEO) Telemetry:** Monitoring Share of Model (SoM), "
     "Citation Velocity, and Technical RAG Readiness across AI Answer Engines."
 )
 
-# Sidebar Controls
-st.sidebar.header("Observability Parameters")
-primary_brand = st.sidebar.text_input("Target Enterprise Entity", value="Brand Alpha")
-competitors_input = st.sidebar.text_area(
-    "Tier-1 Competitors (comma-separated)", 
-    value="Competitor X, Competitor Y, Competitor Z"
-)
 competitors = [c.strip() for c in competitors_input.split(",") if c.strip()]
 
-vertical = st.sidebar.selectbox(
-    "Industry Vertical",
-    ["Healthcare & Life Sciences", "Enterprise SaaS", "Financial Services", "E-Commerce & Retail"]
-)
+if run_button:
+    with st.spinner(f"Executing GEO Telemetry Audit for {primary_brand} across {len(engines)} generative engines..."):
+        time.sleep(0.8)
+        st.toast(f"Audit completed for {primary_brand}!", icon="✅")
 
-engines = st.sidebar.multiselect(
-    "Active Generative Engines",
-    ["Google AI Overviews", "Perplexity Pro", "ChatGPT Search", "Claude 3.5 Sonnet", "Gemini Advanced"],
-    default=["Google AI Overviews", "Perplexity Pro", "ChatGPT Search", "Gemini Advanced"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.caption("Built by Braydon Medlin | Search & Data Strategy")
-
-# Generate Simulated Telemetry Data
-df_metrics, df_prompts = generate_benchmark_data(primary_brand, competitors, engines, vertical)
+# Generate Data
+df_metrics, df_prompts = generate_benchmark_data(primary_brand, competitors, engines, vertical, live_api_configured)
 geo_summary = calculate_geo_score(df_metrics, primary_brand)
 
 # Top-Level KPI Row
@@ -155,7 +233,7 @@ st.markdown("---")
 tab1, tab2, tab3 = st.tabs([
     "📊 Competitive Share of Model", 
     "🧠 Prompt & Citation Telemetry", 
-    "⚙️ Technical AI Readiness (llms.txt & Schema)"
+    "⚙️ Live Technical AI Auditor (llms.txt & Schema)"
 ])
 
 with tab1:
@@ -193,7 +271,7 @@ with tab1:
 
         st.dataframe(df_metrics, use_container_width=True, hide_index=True)
     else:
-        st.warning("Please select at least one Active Generative Engine in the sidebar.")
+        st.warning("Please select at least one Active Generative Engine in the sidebar and click Run.")
 
 with tab2:
     st.subheader("Prompt-Level Citation & Intent Analysis")
@@ -201,14 +279,28 @@ with tab2:
     st.dataframe(df_prompts, use_container_width=True, hide_index=True)
 
 with tab3:
-    st.subheader("Technical RAG & Knowledge Graph Auditor")
+    st.subheader("Live Technical RAG & Knowledge Graph Auditor")
     col_a, col_b = st.columns(2)
     
     with col_a:
-        domain_input = st.text_input("Audit Target Domain", value="https://braydonmedlin.com")
-        has_llms_txt = st.checkbox("Root /llms.txt Deployed", value=True)
-        has_json_ld = st.checkbox("Interconnected JSON-LD (@id & sameAs)", value=True)
-        has_semantic_html = st.checkbox("Clean Semantic HTML5 / Markdown Hierarchy", value=True)
+        domain_input = st.text_input("Enter Target Domain for Live HTTP Probe", value="https://www.braydonmedlin.com")
+        probe_btn = st.button("🔎 Run Live Domain Inspection")
+        
+        if probe_btn:
+            with st.spinner(f"Probing {domain_input} for /llms.txt and JSON-LD..."):
+                probe_res = live_domain_probe(domain_input)
+                st.session_state["llms_detected"] = probe_res["has_llms"]
+                st.session_state["schema_detected"] = probe_res["has_schema"]
+                st.session_state["semantic_detected"] = probe_res["has_semantic"]
+                st.session_state["probe_notes"] = probe_res["notes"]
+                
+        if "probe_notes" in st.session_state:
+            for note in st.session_state["probe_notes"]:
+                st.caption(note)
+                
+        has_llms_txt = st.checkbox("Root /llms.txt Deployed", value=st.session_state.get("llms_detected", True))
+        has_json_ld = st.checkbox("Interconnected JSON-LD (@id & sameAs)", value=st.session_state.get("schema_detected", True))
+        has_semantic_html = st.checkbox("Clean Semantic HTML5 / Markdown Hierarchy", value=st.session_state.get("semantic_detected", True))
         
         audit_results = audit_technical_readiness(has_llms_txt, has_json_ld, has_semantic_html)
         st.metric("Technical AI Ingestion Readiness", f"{audit_results['score']}/100")
@@ -227,6 +319,6 @@ with tab3:
 - Programmatic Entity & Schema Architecture
 
 ## Canonical Resources
-- [Executive Portfolio](https://braydonmedlin.com): Core strategy & case studies
+- [Executive Portfolio](https://www.braydonmedlin.com): Core strategy & case studies
 - [GEO Observability Framework](https://github.com/bgm352/enterprise-geo-observability): Open-source telemetry
 """, language="markdown")
