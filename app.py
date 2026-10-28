@@ -1,7 +1,3 @@
-app.py
-The main Streamlit dashboard application. If your Streamlit Cloud app is connected to this repo, pushing this file will render a multi-tab Enterprise GEO dashboard.
-
-```python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
