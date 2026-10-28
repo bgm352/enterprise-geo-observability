@@ -47,7 +47,7 @@ def generate_benchmark_data(primary_brand: str, competitors: list, engines: list
         f"Best enterprise solutions for {vertical.lower()} data strategy",
         f"How do top {vertical.lower()} organizations optimize search visibility?",
         f"Compare {primary_brand} vs {competitors[0] if competitors else 'Industry Standard'} capabilities",
-        f"Clinical and enterprise benchmarks in {vertical.lower()} digital health",
+        f"Enterprise benchmarks and market leaders in {vertical.lower()}",
         f"Top rated platforms for automated analytics in {vertical.lower()}"
     ]
     
@@ -175,15 +175,15 @@ live_api_configured = any([openai_key, perplexity_key, gemini_key])
 
 with st.sidebar.form("geo_parameters_form"):
     st.subheader("Target Entities")
-    primary_brand = st.text_input("Primary Enterprise Entity", value="Relevate Health")
+    primary_brand = st.text_input("Primary Enterprise Entity", value="Acme Enterprise")
     competitors_input = st.text_area(
         "Tier-1 Competitors (comma-separated)", 
-        value="Competitor Alpha, Competitor Beta, Competitor Gamma"
+        value="Apex Global, Nova Systems, Vertex Corp"
     )
     
     vertical = st.selectbox(
         "Industry Vertical",
-        ["Healthcare & Life Sciences", "Enterprise SaaS", "Financial Services", "E-Commerce & Retail"]
+        ["Enterprise SaaS", "Financial Services", "Healthcare & Life Sciences", "E-Commerce & Retail"]
     )
 
     engines = st.multiselect(
@@ -199,7 +199,7 @@ if live_api_configured:
     st.sidebar.success("🟢 Mode: Live API Telemetry Active")
 else:
     st.sidebar.info("🔵 Mode: Synthetic Benchmark (Add API keys above for live LLM queries)")
-st.sidebar.caption("Built by Braydon Medlin | Search & Data Strategy")
+st.sidebar.caption("Enterprise GEO Observability Engine")
 
 
 # --- MAIN UI DASHBOARD ---
@@ -283,7 +283,7 @@ with tab3:
     col_a, col_b = st.columns(2)
     
     with col_a:
-        domain_input = st.text_input("Enter Target Domain for Live HTTP Probe", value="https://www.braydonmedlin.com")
+        domain_input = st.text_input("Enter Target Domain for Live HTTP Probe", value="https://example.com")
         probe_btn = st.button("🔎 Run Live Domain Inspection")
         
         if probe_btn:
@@ -313,12 +313,12 @@ with tab3:
         st.code("""# Enterprise Entity Overview
 > Authoritative summary for LLM ingestion and RAG pipelines.
 
-## Core Competencies
-- Enterprise Search & Data Strategy
-- Generative Engine Optimization (GEO)
-- Programmatic Entity & Schema Architecture
+## Core Solutions & Architecture
+- Cloud Data & Analytics Platform
+- Generative Engine Optimization (GEO) Telemetry
+- Programmatic Entity & Schema Graph
 
-## Canonical Resources
-- [Executive Portfolio](https://www.braydonmedlin.com): Core strategy & case studies
-- [GEO Observability Framework](https://github.com/bgm352/enterprise-geo-observability): Open-source telemetry
+## Canonical Documentation
+- [Platform Documentation](https://example.com/docs): Core API & integration specs
+- [Enterprise Security & Compliance](https://example.com/security): SOC2 & governance overview
 """, language="markdown")
