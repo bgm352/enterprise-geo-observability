@@ -1,0 +1,15 @@
+# Enterprise GEO Observability (bgm352/enterprise-geo-observability)
+
+> Programmatic framework and interactive telemetry dashboard for Generative Engine Optimization (GEO), AI Share of Model (SoM) tracking, and Technical RAG Readiness auditing.
+
+## Project Context
+Created by Braydon Medlin (Senior Strategist, Search & Data Strategy). Designed to bridge traditional enterprise SEO and search intelligence with modern LLM citation and entity salience architecture.
+
+## Key Modules
+- `app.py`: Streamlit executive dashboard visualizing competitive AI visibility, citation share, and entity salience.
+- `geo_engine.py`: Core scoring algorithms for Share of Model (SoM), Citation Rate, and `llms.txt` / JSON-LD readiness validation.
+
+## Live Deployment & Author Links
+- Live Application: https://geosearch-7ps4jbhmptqetyyefnavtu.streamlit.app/
+- Author Portfolio: https://braydonmedlin.com
+- GitHub Profile: https://github.com/bgm352
